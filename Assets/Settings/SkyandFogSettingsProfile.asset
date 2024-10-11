@@ -185,13 +185,13 @@ MonoBehaviour:
     m_Value: 1000
   baseHeight:
     m_OverrideState: 0
-    m_Value: 0
+    m_Value: -87.3
   maximumHeight:
     m_OverrideState: 0
     m_Value: 50
   meanFreePath:
     m_OverrideState: 0
-    m_Value: 400
+    m_Value: 3.24
   enableVolumetricFog:
     m_OverrideState: 1
     m_Value: 1
@@ -268,8 +268,8 @@ MonoBehaviour:
     m_OverrideState: 1
     m_Value: 4
   cloudType:
-    m_OverrideState: 0
-    m_Value: 0
+    m_OverrideState: 1
+    m_Value: 1
   skyAmbientMode:
     m_OverrideState: 1
     m_Value: 0
@@ -290,7 +290,7 @@ MonoBehaviour:
     m_Value: 0
   windSpeed:
     m_OverrideState: 0
-    m_Value: 0
+    m_Value: 5.3
   fogType:
     m_OverrideState: 1
     m_Value: 0

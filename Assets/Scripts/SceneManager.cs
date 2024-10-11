@@ -6,6 +6,7 @@ using System.Linq;
 using System.Collections;
 using UnityEngine.Rendering;
 using Unity.VisualScripting;
+using static UnityEditor.PlayerSettings;
 
 public class SceneManager : MonoBehaviour
 {
@@ -45,6 +46,8 @@ public class SceneManager : MonoBehaviour
 
     private List<GlowObject> glowObjects = new List<GlowObject>();
     private List<GlowObject> dimmingObjects = new List<GlowObject>();
+    private List<Vector3[]> originalWorldMeshVertices = new List<Vector3[]>();
+    private List<Mesh> worldMeshes = new List<Mesh>();
 
     class MidiNote
     {
@@ -70,30 +73,66 @@ public class SceneManager : MonoBehaviour
 
     class GlowObject
     {
-        public GlowObject(Material material, SubMeshDescriptor submesh, Vector3 worldSpaceCenter)
+        public GlowObject(Material material, SubMeshDescriptor submesh, Vector3 worldSpaceCenter, Mesh mesh, int submeshNumber)
         {
             Mat = material;
             SubMesh = submesh;
             WorldSpaceCenter = worldSpaceCenter;
+            myMesh = mesh;
+            this.submeshNumber = submeshNumber;
         }
 
         public void MakeGlow(float intensity)
         {
-            maxIntensity = intensity;
-            CurrentIntensity = maxIntensity;
-            CurrentExposureWeight = 0f;
+            if (!texturesApplied)
+            {
+                maxIntensity = intensity;
+                CurrentIntensity = maxIntensity;
+                CurrentExposureWeight = 0f;
+            }
+        }
+
+        public void Vibrate(float intensity)
+        {
+            if (!texturesApplied)
+            {
+                maxVibrateIntensity = intensity;
+            }
+        }
+
+        public void ApplyTextures()
+        {
             Mat.mainTexture = Mat.GetTexture("_EmissiveColorMap");
+            texturesApplied = true;
         }
 
         public void Update(float deltaTime)
         {
             Mat.SetFloat("_EmissiveExposureWeight", CurrentExposureWeight);
             Mat.SetColor("_EmissiveColor", emissionColor * CurrentIntensity);
-            CurrentIntensity -= (deltaTime * 100);
-            CurrentExposureWeight += ((deltaTime * 100f) / (maxIntensity));
+            CurrentIntensity -= (deltaTime * 15f);
+            CurrentExposureWeight += ((deltaTime * 15f) / (maxIntensity));
 
             CurrentExposureWeight = Mathf.Clamp01(CurrentExposureWeight);
             CurrentIntensity = Mathf.Clamp(CurrentIntensity, 1.0f, maxIntensity);
+
+            if(maxVibrateIntensity > 0)
+            {
+                var vertices = myMesh.vertices;
+
+                foreach (var v in myMesh.GetIndices(submeshNumber))
+                {
+                    var vertex = vertices[v];
+                    var x = Mathf.Sin(Time.timeSinceLevelLoad * 4) * maxVibrateIntensity + vertex.x;
+                    var y = 0 + vertex.y;
+                    var z = Mathf.Sin(Time.timeSinceLevelLoad * 4) * maxVibrateIntensity + vertex.z;
+
+                    vertices[v].Set(x, y, z);
+                }
+
+                myMesh.vertices = vertices;
+                maxVibrateIntensity -= ((deltaTime * 15f) / maxIntensity) / 100f;
+            }
         }
 
         public Material Mat;
@@ -103,9 +142,15 @@ public class SceneManager : MonoBehaviour
         public float CurrentIntensity = 1f;
         public float CurrentExposureWeight = 1f;
 
+        private Mesh myMesh;
+        private int submeshNumber;
+        private Vector3[] originalVertices;
         private float maxIntensity = 0;
+        private float maxVibrateIntensity = 0;
+        //private float vibrateInterval = ;
 
         private Color emissionColor = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+        private bool texturesApplied = false;
     }
 
     void Start()
@@ -145,10 +190,16 @@ public class SceneManager : MonoBehaviour
             g.Update(Time.deltaTime);
         }
 
-        Sun.eulerAngles += new Vector3(Time.deltaTime / 5.0f, 0, 0);
+        Sun.eulerAngles += new Vector3(Time.deltaTime / 4.8f, 0, 0);
 
         WindmillA.eulerAngles -= new Vector3(0, 0, Time.deltaTime * 4);
         WindmillB.eulerAngles -= new Vector3(0, 0, Time.deltaTime * 4);
+
+        bird.position +=
+            new Vector3(
+                (Mathf.PerlinNoise1D(Time.timeSinceLevelLoad) - 0.5f) / 200.0f,
+                (Mathf.PerlinNoise1D(Time.timeSinceLevelLoad + 1.0f) - 0.5f) / 200.0f, 
+                (Mathf.Sin(Time.timeSinceLevelLoad / 2.0f) / 350) + (Mathf.PerlinNoise1D(Time.timeSinceLevelLoad + 1.0f) - 0.5f) / 300.0f);
 
         if (!song.isPlaying || midiNotes[0].Count - 1 < trackIndices[0]) return;
 
@@ -161,27 +212,65 @@ public class SceneManager : MonoBehaviour
             foreach(var g in glowObjects)
             {
                 var pitchDelta = Mathf.Abs(midiNote.Pitch - ConvertToNoteSpace(g.WorldSpaceCenter.y));
+                var glowIntensity = midiNote.Velocity / 3.0f;
                 if (pitchDelta <= PitchDeltaTolerance)
                 {
-                    g.MakeGlow(30f);
+                    g.MakeGlow(glowIntensity);
+                    g.Vibrate(0.0015f);
                 }
                 if(midiNote.Pitch == lowestPitch)
                 {
-                    g.MakeGlow(30f);
+                    g.MakeGlow(glowIntensity);
+                    g.ApplyTextures();
+                    for (int i = 0; i < worldMeshes.Count; i++)
+                    {
+                        worldMeshes[i].vertices = originalWorldMeshVertices[i];
+                    }
+
                 }
             }
             
             trackIndices[0]++;
         }
 
-        var melody2Note = midiNotes[2][trackIndices[2]];
-
-        if (timeSinceSongStart >= melody2Note.Time)
+        if (midiNotes[2].Count - 1 > trackIndices[2])
         {
-            var pos = new Vector3(midiNote.Pitch - 100, midiNote.Velocity / 10.0f, 0) + ParticleCenter.position;
-            Instantiate(Melody2Burst, pos, Quaternion.identity);
+            var melody2Note = midiNotes[2][trackIndices[2]];
 
-            trackIndices[2]++;
+            if (timeSinceSongStart >= melody2Note.Time)
+            {
+                Debug.Log($"melody2 note: {melody2Note}");
+
+                float x;
+                float y;
+                float z;
+                Vector3 pos;
+
+                if(trackIndices[2] < 4)
+                {
+                    x = melody2Note.Pitch * 2 - 85f;
+                    y = melody2Note.Pitch / 2f - 16f;
+                    z = melody2Note.Pitch / 4f;
+                    pos = new Vector3(x * -1, y, z - 18.5f) + ParticleCenter.position;
+                }
+                else if(trackIndices[2] < 8)
+                {
+                    x = melody2Note.Pitch / 4.7f - 20f;
+                    y = melody2Note.Pitch / 5.7f - 5f;
+                    z = melody2Note.Pitch / 4f;
+                    pos = new Vector3(x * -1, y, z - 18.5f) + ParticleCenter.position;
+                }
+                else
+                {
+                    x = melody2Note.Pitch / 4.7f - 13f;
+                    y = melody2Note.Pitch / 5.7f + 2f;
+                    z = melody2Note.Pitch / 4f;
+                    pos = new Vector3(x * -1, y, z - 18.5f) + ParticleCenter.position;
+                }
+
+                Instantiate(Melody2Burst, pos, Quaternion.identity);
+                trackIndices[2]++;
+            }
         }
 
 
@@ -199,9 +288,9 @@ public class SceneManager : MonoBehaviour
         {
             var renderer = t.GetComponent<Renderer>();
             var emissionColor = new Color(1.0f, 1.0f, 1.0f, 1.0f);
-            var intensity = 30f;
             Mesh mesh = t.GetComponent<MeshFilter>().mesh;
-            Debug.Log("Submeshes: " + mesh.subMeshCount);
+            worldMeshes.Add(mesh);
+            originalWorldMeshVertices.Add(mesh.vertices);
 
             int i = 0;
             //each entery in the array corresponds to a submesh
@@ -211,14 +300,14 @@ public class SceneManager : MonoBehaviour
                 SubMeshDescriptor submesh = mesh.GetSubMesh(i);
 
                 // For whatever reason, the main level submesh reports world coordinates on bound center property already
-                if (mesh.subMeshCount == 22)
-                {
-                    glowie = new GlowObject(m, submesh, (submesh.bounds.max + submesh.bounds.center) / 2f);
-                }
-                else
-                {
-                    glowie = new GlowObject(m, submesh, t.TransformPoint(submesh.bounds.center));
-                }
+                //if (mesh.subMeshCount == 22)
+                //{
+                //    glowie = new GlowObject(m, submesh, (submesh.bounds.max + submesh.bounds.center) / 2f, mesh, i);
+                //}
+                //else
+                //{
+                    glowie = new GlowObject(m, submesh, t.TransformPoint(submesh.bounds.center), mesh, i);
+                //}
 
                 //var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 //cube.transform.position = glowie.WorldSpaceCenter;

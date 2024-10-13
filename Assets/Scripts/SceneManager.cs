@@ -1,12 +1,8 @@
 using MidiParser;
-using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
-using System.Linq;
 using System.Collections;
 using UnityEngine.Rendering;
-using Unity.VisualScripting;
-using static UnityEditor.PlayerSettings;
 
 public class SceneManager : MonoBehaviour
 {
@@ -159,28 +155,21 @@ public class SceneManager : MonoBehaviour
 
         ReadMidiData();
 
-        int i = 0;
-        foreach (var notes in midiNotes)
-        {
-            Debug.Log($"-------Notes for track {i}-------");
-            foreach (var note in notes)
-            {
-                Debug.Log(note);
-            }
-            Debug.Log("\n");
-            i++;
-        }
+        //int i = 0;
+        //foreach (var notes in midiNotes)
+        //{
+        //    Debug.Log($"-------Notes for track {i}-------");
+        //    foreach (var note in notes)
+        //    {
+        //        Debug.Log(note);
+        //    }
+        //    Debug.Log("\n");
+        //    i++;
+        //}
 
         InitGlowObjs();
 
         StartCoroutine(StartSongWithDelay(3.0f));
-
-        //ReadAllWavData();
-
-        //foreach(var sample in audioSamples[0])
-        //{
-        //    Debug.Log(sample);
-        //}
     }
 
     void Update()
@@ -190,10 +179,10 @@ public class SceneManager : MonoBehaviour
             g.Update(Time.deltaTime);
         }
 
-        Sun.eulerAngles += new Vector3(Time.deltaTime / 4.8f, 0, 0);
+        Sun.eulerAngles += new Vector3(Time.deltaTime / 3.3f, 0, 0);
 
-        WindmillA.eulerAngles -= new Vector3(0, 0, Time.deltaTime * 4);
-        WindmillB.eulerAngles -= new Vector3(0, 0, Time.deltaTime * 4);
+        WindmillA.eulerAngles -= new Vector3(0, 0, Time.deltaTime * 4.5f);
+        WindmillB.eulerAngles -= new Vector3(0, 0, Time.deltaTime * 4.5f);
 
         bird.position +=
             new Vector3(
@@ -298,48 +287,12 @@ public class SceneManager : MonoBehaviour
             {
                 GlowObject glowie;
                 SubMeshDescriptor submesh = mesh.GetSubMesh(i);
-
-                // For whatever reason, the main level submesh reports world coordinates on bound center property already
-                //if (mesh.subMeshCount == 22)
-                //{
-                //    glowie = new GlowObject(m, submesh, (submesh.bounds.max + submesh.bounds.center) / 2f, mesh, i);
-                //}
-                //else
-                //{
-                    glowie = new GlowObject(m, submesh, t.TransformPoint(submesh.bounds.center), mesh, i);
-                //}
-
-                //var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                //cube.transform.position = glowie.WorldSpaceCenter;
-
-                //if (glowie.WorldSpaceCenter.y < topOfWorld.position.y - ((topOfWorld.position.y - bottomOfWorld.position.y) / 2))
-                //{
-                //    glowie.MakeGlow(intensity);
-                //}
-
-                var tex = m.mainTexture;
+                glowie = new GlowObject(m, submesh, t.TransformPoint(submesh.bounds.center), mesh, i);
                 m.mainTexture = null;
                 glowObjects.Add(glowie);
-                //m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-                //m.SetInt("_UseEmissiveIntensity", 1);
-                //m.SetFloat("_EmissiveIntensity", 20f);
-                //m.SetFloat("_EmissiveExposureWeight", 0f);
-                //m.EnableKeyword("_EMISSION");
-                //m.SetTexture("_EmissiveColorMap", tex);
-                //m.SetTexture("_EmissiveColorMap", null);
-
-                //m.SetColor("_EmissiveColor", emissionColor * intensity);
-                //RendererExtensions.UpdateGIMaterials(renderer);
-                //DynamicGI.SetEmissive(renderer, emissionColor * intensity);
-                //DynamicGI.UpdateEnvironment();
                 i++;
             }
         }
-    }
-
-    private void DoTrackEffect()
-    {
-
     }
 
     private void ReadAllWavData()
@@ -359,7 +312,16 @@ public class SceneManager : MonoBehaviour
 
     private void ReadMidiData()
     {
-        var midiFile = new MidiFile($"{Application.dataPath}\\Audio\\windwindmill.mid");
+        string path = "";
+        if (Application.isEditor)
+        {
+            path = $"{Application.dataPath}\\Audio\\windwindmill.mid";
+        }
+        else
+        {
+            path = $"{System.IO.Directory.GetCurrentDirectory()}\\Audio\\windwindmill.mid";
+        }
+        var midiFile = new MidiFile(path);
 
         foreach (var track in midiFile.Tracks)
         {

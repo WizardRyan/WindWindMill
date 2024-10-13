@@ -1154,7 +1154,7 @@ MonoBehaviour:
       m_Type:
         m_SerializableType: UnityEditor.VFX.Vector, Unity.VisualEffectGraph.Editor,
           Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-      m_SerializableObject: '{"vector":{"x":0.0,"y":0.05999999865889549,"z":-4.059999942779541}}'
+      m_SerializableObject: '{"vector":{"x":0.0,"y":0.05999999865889549,"z":-6.760000228881836}}'
     m_Space: 1
   m_Property:
     name: Force
